@@ -191,3 +191,12 @@ Use these official guides when checking provider-specific UI labels or current s
 - Supabase Storage quickstart: https://supabase.com/docs/guides/storage/quickstart
 - Supabase JWT guidance: https://supabase.com/docs/guides/auth/jwts
 - Mailgun documentation: https://documentation.mailgun.com/
+
+
+### Users and profiles
+
+- Supabase Auth owns user accounts and credentials in its managed `auth.users` table. Do not create a second `users` table to store passwords or duplicate Google sign-in data.
+- Use the Supabase Auth user UUID as the customer's ID. Set `orders.user_id` to reference `auth.users(id)` with an appropriate delete policy.
+- A public `profiles` table is optional. Add one only for app-specific data the shop needs, such as a display name or phone number. Key it by `user_id` referencing `auth.users(id)`, and apply RLS so users can read/update only their own profile.
+- Do not let users assign themselves a role or owner flag in `profiles`. Keep shop-owner authorization in a server-controlled allowlist or another trusted server-side configuration.
+- Create a profile row on first sign-in only if the app needs profile fields; order history should work directly from the Auth user UUID.
