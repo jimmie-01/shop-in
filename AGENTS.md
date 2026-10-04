@@ -74,6 +74,8 @@ Keep components and files small and name them by purpose. Add a dependency only 
 Use migrations checked into `supabase/migrations/` (or the project's established migration tool) so the schema can be recreated. A practical starting schema is:
 
 - `products`: `id`, `name`, `description`, `price` (numeric; never floating-point money), `image_path` or `image_url`, `stock_quantity` (if tracking stock), `is_active`, timestamps.
+- Supabase Auth manages accounts and credentials in its protected `auth.users` table. Do not create a second `users` table for passwords or duplicate Google sign-in details. Reference `auth.users.id` from `orders.user_id` as the customer's stable ID.
+- A public `profiles` table is optional and should only hold app-specific fields the shop needs, such as display name or phone. If used, key it by `user_id` referencing `auth.users(id)` and use RLS so each user can access only their own profile. Never let a user set their own owner/admin role in a profile row.
 - `orders`: `id`, `user_id` (Supabase Auth user UUID), customer/delivery fields, `status`, `total_amount`, timestamps.
 - `order_items`: `id`, `order_id`, `product_id` (nullable if product is later removed), `product_name`, `unit_price`, `quantity`, `line_total`.
 
@@ -168,7 +170,40 @@ Use consistent JSON responses, appropriate HTTP status codes, request validation
 - Do not mark an order paid unless a real payment provider confirms it. If this version collects orders without online payment, label its status honestly (for example `pending`).
 - Explain new React concepts (components, props, state, effects, forms) briefly as they appear. Avoid introducing state libraries or elaborate architecture for this MVP.
 
-## 9. Completion checklist
+## 9. Testing guidance
+
+Testing is part of the MVP, not a later cleanup task. Add tests in small stages and explain what each level checks. First inspect the repository and keep its existing test tools if they work; if starting fresh, choose a simple TypeScript-compatible test runner and document the commands in `README.md`.
+
+### Unit tests
+
+- Test isolated business rules and UI behavior without making network calls.
+- Prioritize server-side total calculation, quantity and input validation, product availability checks, order status rules, and owner authorization decisions.
+- Add focused React tests for important interactions such as changing cart quantity, removing an item, and showing loading/error/empty states.
+- Mock external boundaries such as Supabase, Google OAuth, and Mailgun. Unit tests must not require real credentials.
+
+### Integration tests
+
+- Test Express routes together with middleware, validation, and database access using a dedicated local/test Supabase project or a clearly isolated test database.
+- Cover product reads and owner-only writes, order creation from database prices, persistent order reads, and attempts to read another user's order.
+- Test that an email-provider failure does not undo a saved order. Use a Mailgun mock or test adapter; never send real customer email from automated tests.
+- Keep test data separate from production. Never run cleanup scripts or migrations against the production database as part of tests.
+
+### End-to-end tests
+
+- Use a browser automation tool (for example Playwright) to exercise the app as a customer and as the owner.
+- Cover catalogue browsing, cart/checkout validation, successful order confirmation, sign-out and return sign-in, and order history persistence.
+- Include authorization checks: a regular customer cannot access owner controls, and a customer cannot see another customer's orders.
+- Do not automate real Google or Mailgun credentials in routine CI. Provide a documented test authentication strategy (such as a dedicated test account or controlled auth fixture) and stub email delivery.
+- Run E2E tests against a local/test environment, never against production data or real customer accounts.
+
+### Test practices
+
+- Provide clear scripts such as `test`, `test:unit`, `test:integration`, and `test:e2e` where supported by the repository; explain which services each command needs.
+- Make tests deterministic, isolated, and safe to rerun. Avoid depending on test execution order, live third-party services, or fixed shared records.
+- Include critical security and persistence behaviors in tests, not just happy-path rendering.
+- Before declaring implementation complete, run the relevant test suites and builds, report the exact commands and results, and clearly identify tests that could not run because setup or credentials are missing.
+
+## 10. Completion checklist
 
 - [ ] Visitor can browse active appliance products and view their images and prices.
 - [ ] Only the configured owner can add/update/deactivate products and manage product images.
@@ -177,12 +212,14 @@ Use consistent JSON responses, appropriate HTTP status codes, request validation
 - [ ] A successful checkout creates one persistent order and item snapshots.
 - [ ] Confirmation email is attempted through Mailgun after saving the order, with failure handled safely.
 - [ ] Google sign-in/out works through Supabase Auth.
+- [ ] Supabase Auth user IDs are used for order ownership; no duplicate credentials table is introduced. A `profiles` table exists only if app-specific profile data is needed.
 - [ ] A returning signed-in customer sees their orders after closing and reopening the app.
 - [ ] Customers cannot read one another's orders.
+- [ ] Unit, integration, and end-to-end tests cover key business rules, persistence, and access controls, and their setup/commands are documented.
 - [ ] No service-role, Google secret, or Mailgun key is present in client code or committed files.
 - [ ] README explains prerequisites, environment variables, migrations, local startup, and the Google/Supabase/Mailgun setup in beginner-friendly steps.
 
-## 10. Official setup references
+## 11. Official setup references
 
 Use these official guides when checking provider-specific UI labels or current setup details:
 
@@ -191,6 +228,7 @@ Use these official guides when checking provider-specific UI labels or current s
 - Supabase Storage quickstart: https://supabase.com/docs/guides/storage/quickstart
 - Supabase JWT guidance: https://supabase.com/docs/guides/auth/jwts
 - Mailgun documentation: https://documentation.mailgun.com/
+
 
 
 ### Users and profiles
